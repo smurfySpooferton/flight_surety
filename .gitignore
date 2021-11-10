@@ -106,6 +106,14 @@ dist
 # IntelliJ
 .idea
 
+# Node
+build/
+prod/
+
 # Secrets
 mnemonic
 infura
+
+# Project
+src/dapp/config.json
+src/server/config.json
