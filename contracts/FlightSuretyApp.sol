@@ -121,7 +121,7 @@ contract FlightSuretyApp {
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() public returns(bool) {
+    function isOperational() public view returns(bool) {
         return flightSuretyData.isOperational();  // Modify to call data contract's status
     }
 
@@ -164,13 +164,14 @@ contract FlightSuretyApp {
         consensus.votes.add(1);
         consensus.voters[msg.sender] = true;
         applications[applicant] = consensus;
+        performConsensus(applicant);
         return consensus.votes;
     }
 
     function performConsensus(address applicant) private requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) {
         uint256 requiredVotes = (flightSuretyData.getRegisteredAirlineCount() / 2) + 1;
         if (applications[applicant].votes >= requiredVotes) {
-
+            flightSuretyData.registerAirline(applicant);
         }
     }
 
