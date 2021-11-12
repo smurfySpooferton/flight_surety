@@ -16,6 +16,8 @@ contract FlightSuretyApp {
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
+    uint8 private constant AIRLINE_NO_CONSENT_THRESHOLD = 4;
+
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
     uint8 private constant STATUS_CODE_ON_TIME = 10;
@@ -32,9 +34,18 @@ contract FlightSuretyApp {
         uint256 updatedTimestamp;        
         address airline;
     }
-    mapping(bytes32 => Flight) private flights;
 
- 
+    struct Consensus {
+        uint256 votes;
+        mapping (address => bool) voters;
+    }
+
+    mapping(bytes32 => Flight) private flights;
+    mapping(address => Consensus) private applications;
+
+    uint256 private pendingApplicationsCount = 0;
+    FlightSuretyData private flightSuretyData;
+
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -63,6 +74,36 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireIsFirstVoteOnApplicant(address needle) {
+        require(!applications[needle].voters[msg.sender], "Multiple votes are not permitted");
+        _;
+    }
+
+    modifier requireIsRegistered(address needle) {
+        require(flightSuretyData.isRegistered(needle), "Airline not registered");
+        _;
+    }
+
+    modifier requireNotRegistered(address needle) {
+        require(!flightSuretyData.isRegistered(needle), "Airline is registered");
+        _;
+    }
+
+    modifier requireIsFunded(address needle) {
+        require(flightSuretyData.isFunded(needle), "Airline not funded");
+        _;
+    }
+
+    modifier requireIsApplicant(address needle) {
+        require(applications[needle].votes > 0, "Airline not an applicant");
+        _;
+    }
+
+    modifier requireConsensusNeccessary() {
+        require(flightSuretyData.getRegisteredAirlineCount() < AIRLINE_NO_CONSENT_THRESHOLD, "Consensu not neccessary; Invalid state.");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -71,24 +112,26 @@ contract FlightSuretyApp {
     * @dev Contract constructor
     *
     */
-    constructor
-                                (
-                                ) 
-                                public 
-    {
+    constructor(address _firstAirline) public payable {
         contractOwner = msg.sender;
+        flightSuretyData = FlightSuretyData(_firstAirline);
     }
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() 
-                            public 
-                            pure 
-                            returns(bool) 
-    {
-        return true;  // Modify to call data contract's status
+    function isOperational() public returns(bool) {
+        return flightSuretyData.isOperational();  // Modify to call data contract's status
+    }
+
+    /**
+    * @dev Sets contract operations on/off
+    *
+    * When operational mode is disabled, all write transactions except for this one will fail
+    */
+    function setOperatingStatus(bool mode) external requireContractOwner {
+        flightSuretyData.setOperatingStatus(mode);
     }
 
     /********************************************************************************************/
@@ -100,16 +143,36 @@ contract FlightSuretyApp {
     * @dev Add an airline to the registration queue
     *
     */   
-    function registerAirline
-                            (   
-                            )
-                            external
-                            pure
-                            returns(bool success, uint256 votes)
-    {
-        return (success, 0);
+    function registerAirline(address applicant) external {
+        if (flightSuretyData.getRegisteredAirlineCount() < AIRLINE_NO_CONSENT_THRESHOLD) {
+            pendingApplicationsCount.sub(1);
+            flightSuretyData.registerAirline(applicant);
+        } else {
+            proposeAirline(applicant);
+        }
     }
 
+    function proposeAirline(address applicant) private requireIsOperational requireNotRegistered(applicant) {
+        uint256 votes = 1;
+        applications[applicant] = Consensus(votes);
+        applications[applicant].voters[msg.sender] = true;
+        pendingApplicationsCount = pendingApplicationsCount.add(votes);
+    }
+
+    function vote(address applicant) external requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) requireIsRegistered(msg.sender) requireIsFunded(msg.sender) requireIsFirstVoteOnApplicant(applicant) returns(uint256 votes) {
+        Consensus consensus = applications[applicant];
+        consensus.votes.add(1);
+        consensus.voters[msg.sender] = true;
+        applications[applicant] = consensus;
+        return consensus.votes;
+    }
+
+    function performConsensus(address applicant) private requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) {
+        uint256 requiredVotes = (flightSuretyData.getRegisteredAirlineCount() / 2) + 1;
+        if (applications[applicant].votes >= requiredVotes) {
+
+        }
+    }
 
    /**
     * @dev Register a future flight for insuring.
@@ -160,7 +223,7 @@ contract FlightSuretyApp {
                                             });
 
         emit OracleRequest(index, airline, flight, timestamp);
-    } 
+    }
 
 
 // region ORACLE MANAGEMENT
@@ -334,4 +397,14 @@ contract FlightSuretyApp {
 
 // endregion
 
-}   
+}
+
+contract FlightSuretyData {
+    function isOperational() public view returns(bool);
+    function setOperatingStatus(bool mode) external;
+    function isFunded(address needle) public view returns(bool);
+    function isRegistered(address needle) public view returns(bool);
+    function getRegisteredAirlineCount() external view returns(uint);
+    function getFundedAirlineCount() external view returns(uint);
+    function registerAirline(address applicant) external;
+}

@@ -5,6 +5,8 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract FlightSuretyData {
     using SafeMath for uint256;
 
+    event DidRegisterAirline(address airline);
+
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
@@ -16,17 +18,25 @@ contract FlightSuretyData {
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
 
+    // Airlines
+    struct Airline {
+        bool isRegistered;
+        bool isFunded;
+        uint256 funds;
+    }
+
+    uint256 private registeredAirlineCount = 0;
+    uint256 private fundedAirlineCount = 0;
+
+    mapping(address => Airline) private allAirlines;
 
     /**
     * @dev Constructor
     *      The deploying account becomes contractOwner
     */
-    constructor
-                                (
-                                ) 
-                                public 
-    {
+    constructor(address _firstAirline) public payable {
         contractOwner = msg.sender;
+        allAirlines[_firstAirline] = Airline(false, false, 0);
     }
 
     /********************************************************************************************/
@@ -56,7 +66,17 @@ contract FlightSuretyData {
         _;
     }
 
-    /********************************************************************************************/
+    modifier requireIsRegistered(address needle) {
+        require(allAirlines[needle].isRegistered, "Airline not registered");
+        _;
+    }
+
+    modifier requireIsFunded(address needle) {
+        require(allAirlines[needle].isFunded, "Airline not funded");
+        _;
+    }
+
+/********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
@@ -93,19 +113,49 @@ contract FlightSuretyData {
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
 
+    /**
+    * @dev Return registeredAirlineCount
+    *
+    */
+    function getRegisteredAirlineCount() external view requireIsOperational returns(uint) {
+        return registeredAirlineCount;
+    }
+
+    /**
+    * @dev Return fundedCount
+    *
+    */
+    function getFundedAirlineCount() external view requireIsOperational returns(uint) {
+        return fundedAirlineCount;
+    }
+
+
+    /**
+    * @dev Return is airlined funded
+    *
+    */
+    function isFunded(address needle) public view requireIsOperational requireIsFunded(needle) returns(bool) {
+        return true;
+    }
+
+    /**
+    * @dev Return is airline registered
+    *
+    */
+    function isRegistered(address needle) public view requireIsOperational requireIsRegistered(needle) returns(bool) {
+        return true;
+    }
+
    /**
     * @dev Add an airline to the registration queue
     *      Can only be called from FlightSuretyApp contract
     *
-    */   
-    function registerAirline
-                            (   
-                            )
-                            external
-                            pure
-    {
+    */
+    function registerAirline(address applicant) external requireIsOperational requireIsRegistered(msg.sender) requireIsFunded(msg.sender) {
+        registeredAirlineCount = registeredAirlineCount.add(1);
+        allAirlines[applicant].isRegistered = true;
+        emit DidRegisterAirline(applicant);
     }
-
 
    /**
     * @dev Buy insurance for a flight
