@@ -143,7 +143,7 @@ contract FlightSuretyApp {
     * @dev Add an airline to the registration queue
     *
     */   
-    function registerAirline(address applicant) external {
+    function registerAirline(address applicant) requireIsOperational requireNotRegistered(applicant) requireIsFunded(msg.sender) external {
         if (flightSuretyData.getRegisteredAirlineCount() < AIRLINE_NO_CONSENT_THRESHOLD) {
             pendingApplicationsCount.sub(1);
             flightSuretyData.registerAirline(applicant);
@@ -152,7 +152,7 @@ contract FlightSuretyApp {
         }
     }
 
-    function proposeAirline(address applicant) private requireIsOperational requireNotRegistered(applicant) {
+    function proposeAirline(address applicant) private requireIsOperational requireNotRegistered(applicant) requireIsFunded(msg.sender) {
         uint256 votes = 1;
         applications[applicant] = Consensus(votes);
         applications[applicant].voters[msg.sender] = true;

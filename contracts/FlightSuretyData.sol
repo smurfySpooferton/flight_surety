@@ -36,7 +36,7 @@ contract FlightSuretyData {
     */
     constructor(address _firstAirline) public payable {
         contractOwner = msg.sender;
-        allAirlines[_firstAirline] = Airline(false, false, 0);
+        allAirlines[_firstAirline] = Airline(true, false, 0);
     }
 
     /********************************************************************************************/
@@ -67,12 +67,12 @@ contract FlightSuretyData {
     }
 
     modifier requireIsRegistered(address needle) {
-        require(allAirlines[needle].isRegistered, "Airline not registered");
+        require(isRegistered(needle), "Airline not registered");
         _;
     }
 
     modifier requireIsFunded(address needle) {
-        require(allAirlines[needle].isFunded, "Airline not funded");
+        require(isFunded(needle), "Airline not funded");
         _;
     }
 
@@ -84,12 +84,8 @@ contract FlightSuretyData {
     * @dev Get operating status of contract
     *
     * @return A bool that is the current operating status
-    */      
-    function isOperational() 
-                            public 
-                            view 
-                            returns(bool) 
-    {
+    */
+    function isOperational() public view returns(bool) {
         return operational;
     }
 
@@ -98,14 +94,8 @@ contract FlightSuretyData {
     * @dev Sets contract operations on/off
     *
     * When operational mode is disabled, all write transactions except for this one will fail
-    */    
-    function setOperatingStatus
-                            (
-                                bool mode
-                            ) 
-                            external
-                            requireContractOwner 
-    {
+    */
+    function setOperatingStatus(bool mode) external requireContractOwner {
         operational = mode;
     }
 
@@ -134,16 +124,16 @@ contract FlightSuretyData {
     * @dev Return is airlined funded
     *
     */
-    function isFunded(address needle) public view requireIsOperational requireIsFunded(needle) returns(bool) {
-        return true;
+    function isFunded(address needle) public view requireIsOperational returns(bool) {
+        return allAirlines[needle].isFunded;
     }
 
     /**
     * @dev Return is airline registered
     *
     */
-    function isRegistered(address needle) public view requireIsOperational requireIsRegistered(needle) returns(bool) {
-        return true;
+    function isRegistered(address needle) public view requireIsOperational returns(bool) {
+        return allAirlines[needle].isRegistered;
     }
 
    /**
