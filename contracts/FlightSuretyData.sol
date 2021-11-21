@@ -6,6 +6,7 @@ contract FlightSuretyData {
     using SafeMath for uint256;
 
     event DidRegisterAirline(address airline);
+    event DidFundAirline(address airline);
 
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
@@ -17,6 +18,8 @@ contract FlightSuretyData {
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
+
+    uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
 
     // Airlines
     struct Airline {
@@ -74,6 +77,18 @@ contract FlightSuretyData {
     modifier requireIsFunded(address needle) {
         require(isFunded(needle), "Airline not funded");
         _;
+    }
+
+    modifier requireNotYetFunded(address needle) {
+        require(!isFunded(needle), "Airline already funded");
+        _;
+    }
+
+    modifier refund(uint256 price) {
+        require(msg.value >= price, "Insufficient Funds.");
+        _;
+        uint refund = msg.value - price;
+        msg.sender.transfer(refund);
     }
 
 /********************************************************************************************/
@@ -147,10 +162,23 @@ contract FlightSuretyData {
         emit DidRegisterAirline(applicant);
     }
 
-   /**
-    * @dev Buy insurance for a flight
+    /**
+    * @dev Fund airline
     *
-    */   
+    */
+    function fundAirline(address airline) external requireIsOperational requireIsRegistered(airline) requireNotYetFunded(airline) refund(AIRLINE_FEE_IN_ETH) payable {
+        address(this).transfer(AIRLINE_FEE_IN_ETH);
+        allAirlines[airline].isFunded = true;
+        allAirlines[airline].funds = allAirlines[airline].funds.add(AIRLINE_FEE_IN_ETH);
+        fundedAirlineCount = fundedAirlineCount.add(1);
+        emit DidFundAirline(airline);
+    }
+
+
+/**
+ * @dev Buy insurance for a flight
+ *
+ */
     function buy
                             (                             
                             )

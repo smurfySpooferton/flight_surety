@@ -6,10 +6,11 @@ let Web3 = require('web3');
 contract('Flight Surety Tests', async (accounts) => {
 
   var config;
-  before('setup contract', async () => {
-    config = await Test.Config(accounts);
-      web3 = new Web3(new Web3.providers.HttpProvider(config.url));
-  });
+    beforeEach('should setup the contract instance', async () => {
+        config = await Test.Config(accounts);
+        web3 = new Web3(new Web3.providers.HttpProvider(config.url));
+        web3.eth.defaultAccount = web3.eth.accounts[0];
+    });
 
   /****************************************************************************************/
   /* Operations and Settings                                                              */
@@ -89,6 +90,19 @@ contract('Flight Surety Tests', async (accounts) => {
     assert.equal(isRegistered, false, "Airline should not be registered.");
     assert.equal(isFunded, false, "Airline should not be able to register another airline if it hasn't provided funding");
   });
- 
 
+    it('Fund airline', async () => {
+        // ARRANGE
+        let airline = config.firstAirline;
+        let amount = web3.utils.toWei('10', 'ether');
+        let isRegistered = await config.flightSuretyData.isRegistered.call(airline);
+
+        //assure account is valid for being funded
+        let isFundedPre = await config.flightSuretyData.isFunded.call(airline);
+        assert.equal(isRegistered, true, "Airline should be registered.");
+        assert.equal(isFundedPre, false, "Airline should not be funded");
+        await config.flightSuretyData.fundAirline(airline, {from: accounts[5], value: amount});
+        let isFundedPost = await config.flightSuretyData.isFunded.call(airline);
+        assert.equal(isFundedPost, true, "Airline should be funded");
+    });
 });
