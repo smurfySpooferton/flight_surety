@@ -13,13 +13,12 @@ contract FlightSuretyData {
     /********************************************************************************************/
 
     address private contractOwner;                                      // Account used to deploy contract
+    address private trustedCaller;
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
-
-    uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
 
     // Airlines
     struct Airline {
@@ -40,6 +39,7 @@ contract FlightSuretyData {
     constructor(address _firstAirline) public payable {
         contractOwner = msg.sender;
         allAirlines[_firstAirline] = Airline(true, false, 0);
+        registeredAirlineCount = 1;
     }
 
     /********************************************************************************************/
@@ -79,16 +79,9 @@ contract FlightSuretyData {
         _;
     }
 
-    modifier requireNotYetFunded(address needle) {
-        require(!isFunded(needle), "Airline already funded");
+    modifier requireCalledFromAppContract() {
+        require(msg.sender == trustedCaller, "Not called from trusted App");
         _;
-    }
-
-    modifier refund(uint256 price) {
-        require(msg.value >= price, "Insufficient Funds.");
-        _;
-        uint refund = msg.value - price;
-        msg.sender.transfer(refund);
     }
 
 /********************************************************************************************/
@@ -114,6 +107,10 @@ contract FlightSuretyData {
         operational = mode;
     }
 
+    function setTrustedCaller(address _trustedCaller) external requireContractOwner {
+        trustedCaller = _trustedCaller;
+    }
+
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -122,7 +119,7 @@ contract FlightSuretyData {
     * @dev Return registeredAirlineCount
     *
     */
-    function getRegisteredAirlineCount() external view requireIsOperational returns(uint) {
+    function getRegisteredAirlineCount() external view requireIsOperational returns(uint256) {
         return registeredAirlineCount;
     }
 
@@ -130,7 +127,7 @@ contract FlightSuretyData {
     * @dev Return fundedCount
     *
     */
-    function getFundedAirlineCount() external view requireIsOperational returns(uint) {
+    function getFundedAirlineCount() external view requireIsOperational returns(uint256) {
         return fundedAirlineCount;
     }
 
@@ -156,7 +153,7 @@ contract FlightSuretyData {
     *      Can only be called from FlightSuretyApp contract
     *
     */
-    function registerAirline(address applicant) external requireIsOperational requireIsRegistered(msg.sender) requireIsFunded(msg.sender) {
+    function registerAirline(address applicant) external requireIsOperational requireCalledFromAppContract {
         registeredAirlineCount = registeredAirlineCount.add(1);
         allAirlines[applicant].isRegistered = true;
         emit DidRegisterAirline(applicant);
@@ -166,19 +163,17 @@ contract FlightSuretyData {
     * @dev Fund airline
     *
     */
-    function fundAirline(address airline) external requireIsOperational requireIsRegistered(airline) requireNotYetFunded(airline) refund(AIRLINE_FEE_IN_ETH) payable {
-        address(this).transfer(AIRLINE_FEE_IN_ETH);
+    function fundAirline(address airline, uint256 funds) external requireIsOperational requireCalledFromAppContract {
         allAirlines[airline].isFunded = true;
-        allAirlines[airline].funds = allAirlines[airline].funds.add(AIRLINE_FEE_IN_ETH);
+        allAirlines[airline].funds = allAirlines[airline].funds.add(funds);
         fundedAirlineCount = fundedAirlineCount.add(1);
         emit DidFundAirline(airline);
     }
 
-
-/**
- * @dev Buy insurance for a flight
- *
- */
+    /**
+     * @dev Buy insurance for a flight
+     *
+     */
     function buy
                             (                             
                             )

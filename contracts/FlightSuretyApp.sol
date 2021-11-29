@@ -16,7 +16,8 @@ contract FlightSuretyApp {
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
-    uint8 private constant AIRLINE_NO_CONSENT_THRESHOLD = 4;
+    uint256 private constant AIRLINE_NO_CONSENT_THRESHOLD = 3; // 4th airline will need consensus
+    uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
 
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -44,7 +45,7 @@ contract FlightSuretyApp {
     mapping(address => Consensus) private applications;
 
     uint256 private pendingApplicationsCount = 0;
-    FlightSuretyData private flightSuretyData;
+    IFlightSuretyData private flightSuretyData;
 
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
@@ -61,7 +62,7 @@ contract FlightSuretyApp {
     modifier requireIsOperational() 
     {
          // Modify to call data contract's status
-        require(true, "Contract is currently not operational");  
+        require(isOperational(), "Contract is currently not operational");
         _;  // All modifiers require an "_" which indicates where the function body will be added
     }
 
@@ -100,8 +101,20 @@ contract FlightSuretyApp {
     }
 
     modifier requireConsensusNeccessary() {
-        require(flightSuretyData.getRegisteredAirlineCount() < AIRLINE_NO_CONSENT_THRESHOLD, "Consensu not neccessary; Invalid state.");
+        require(flightSuretyData.getRegisteredAirlineCount() >= AIRLINE_NO_CONSENT_THRESHOLD, "Consensus not neccessary; Invalid state.");
         _;
+    }
+
+    modifier requireNotYetFunded(address needle) {
+        require(!flightSuretyData.isFunded(needle), "Airline already funded");
+        _;
+    }
+
+    modifier refund(uint256 price) {
+        require(msg.value >= price, "Insufficient Funds.");
+        _;
+        uint256 rest = msg.value - price;
+        msg.sender.transfer(rest);
     }
 
     /********************************************************************************************/
@@ -112,9 +125,9 @@ contract FlightSuretyApp {
     * @dev Contract constructor
     *
     */
-    constructor(address _firstAirline) public payable {
+    constructor(address dataAddress) public payable {
         contractOwner = msg.sender;
-        flightSuretyData = FlightSuretyData(_firstAirline);
+        flightSuretyData = IFlightSuretyData(dataAddress);
     }
 
     /********************************************************************************************/
@@ -138,14 +151,17 @@ contract FlightSuretyApp {
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
 
-  
+    function fundAirline(address airline) requireIsOperational requireIsRegistered(airline) requireNotYetFunded(airline) refund(AIRLINE_FEE_IN_ETH) external payable {
+        address(flightSuretyData).transfer(AIRLINE_FEE_IN_ETH);
+        flightSuretyData.fundAirline(airline, AIRLINE_FEE_IN_ETH);
+    }
+
    /**
     * @dev Add an airline to the registration queue
     *
     */   
-    function registerAirline(address applicant) requireIsOperational requireNotRegistered(applicant) requireIsFunded(msg.sender) external {
+    function registerAirline(address applicant) external requireIsOperational requireNotRegistered(applicant) requireIsFunded(msg.sender) requireIsRegistered(msg.sender) {
         if (flightSuretyData.getRegisteredAirlineCount() < AIRLINE_NO_CONSENT_THRESHOLD) {
-            pendingApplicationsCount.sub(1);
             flightSuretyData.registerAirline(applicant);
         } else {
             proposeAirline(applicant);
@@ -156,19 +172,12 @@ contract FlightSuretyApp {
         uint256 votes = 1;
         applications[applicant] = Consensus(votes);
         applications[applicant].voters[msg.sender] = true;
-        pendingApplicationsCount = pendingApplicationsCount.add(votes);
+        pendingApplicationsCount = pendingApplicationsCount.add(1);
     }
 
-    function vote(address applicant) external requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) requireIsRegistered(msg.sender) requireIsFunded(msg.sender) requireIsFirstVoteOnApplicant(applicant) returns(uint256 votes) {
-        Consensus consensus = applications[applicant];
-        consensus.votes.add(1);
-        consensus.voters[msg.sender] = true;
-        applications[applicant] = consensus;
-        performConsensus(applicant);
-        return consensus.votes;
-    }
-
-    function performConsensus(address applicant) private requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) {
+    function vote(address applicant) external requireIsOperational requireConsensusNeccessary requireIsApplicant(applicant) requireIsRegistered(msg.sender) requireIsFunded(msg.sender) requireIsFirstVoteOnApplicant(applicant) {
+        applications[applicant].votes = applications[applicant].votes.add(1);
+        applications[applicant].voters[msg.sender] = true;
         uint256 requiredVotes = (flightSuretyData.getRegisteredAirlineCount() / 2) + 1;
         if (applications[applicant].votes >= requiredVotes) {
             flightSuretyData.registerAirline(applicant);
@@ -400,12 +409,13 @@ contract FlightSuretyApp {
 
 }
 
-contract FlightSuretyData {
+interface IFlightSuretyData {
     function isOperational() public view returns(bool);
     function setOperatingStatus(bool mode) external;
     function isFunded(address needle) public view returns(bool);
     function isRegistered(address needle) public view returns(bool);
-    function getRegisteredAirlineCount() external view returns(uint);
-    function getFundedAirlineCount() external view returns(uint);
+    function getRegisteredAirlineCount() external view returns(uint256);
+    function getFundedAirlineCount() external view returns(uint256);
     function registerAirline(address applicant) external;
+    function fundAirline(address airline, uint256 funds) external;
 }
