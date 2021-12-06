@@ -2,9 +2,11 @@
 var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
 let Web3 = require('web3');
+const {fa} = require("truffle/build/52.bundled");
 
 contract('Flight Surety Tests', async (accounts) => {
-
+    let time = Math.floor(Date.now() / 1000);
+    let flightNo = "LX1051";
   var config;
     beforeEach('should setup the contract instance', async () => {
         config = await Test.Config(accounts);
@@ -105,22 +107,6 @@ contract('Flight Surety Tests', async (accounts) => {
     assert.equal(isFunded, false, "Airline should not be able to register another airline if it hasn't provided funding");
   });
 
-    it('Register Flight', async () => {
-        let airline = config.firstAirline;
-        let amount = web3.utils.toWei('10', 'ether');
-        await config.flightSuretyApp.fundAirline(airline, {from: accounts[5], value: amount});
-        let time = Math.floor(Date.now() / 1000);
-        let flightNo = "LX1051";
-        let result;
-        try {
-            await config.flightSuretyApp.registerFlight(time, flightNo, {from: airline});
-            result = await config.flightSuretyApp.getFlightStatus.call(airline, flightNo, time, {from: airline});
-        } catch (e) {
-            console.log(e);
-        }
-        assert.equal(result, 10, "Flight is on time by default.");
-    });
-
     it('Fund airline', async () => {
         // ARRANGE
         let airline = config.firstAirline;
@@ -195,5 +181,51 @@ contract('Flight Surety Tests', async (accounts) => {
         assert.equal(register2, true, "Airline should be registered");
         assert.equal(register3, false, "Airline should not be registered");
         assert.equal(consensusPerformed, true, "Airline should be registered now");
+    });
+
+    async function registerAndFundFirstAirline() {
+        let airline = config.firstAirline;
+        let amount = web3.utils.toWei('10', 'ether');
+        await config.flightSuretyApp.fundAirline(airline, {from: accounts[5], value: amount});
+    }
+
+    async function registerFlight() {
+        let airline = config.firstAirline;
+        try {
+            await config.flightSuretyApp.registerFlight(time, flightNo, {from: airline});
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    it('Register Flight', async () => {
+        await registerAndFundFirstAirline();
+        await registerFlight();
+        let airline = config.firstAirline;
+        let result;
+        try {
+            result = await config.flightSuretyApp.getFlightStatus.call(airline, flightNo, time, {from: airline});
+        } catch (e) {
+            console.log(e);
+        }
+        assert.equal(result, 10, "Flight is on time by default.");
+    });
+
+    it('Purchase insurance', async () => {
+        await registerAndFundFirstAirline();
+        await registerFlight();
+        let amount = web3.utils.toWei('1', 'ether');
+        let airline = config.firstAirline;
+        let insuree = accounts[25];
+        let isInsured;
+        try {
+            isInsured = await config.flightSuretyApp.isAlreadyInsured.call(insuree, airline, flightNo, time);
+            assert.equal(isInsured, false, "Insuree should not be insured");
+            await config.flightSuretyApp.buy(airline, flightNo, time, {from: insuree, value: amount});
+            isInsured = await config.flightSuretyApp.isAlreadyInsured.call(insuree, airline, flightNo, time);
+        } catch (e) {
+            console.log(e);
+        }
+        assert.equal(isInsured, true, "Insuree should be insured");
     });
 });

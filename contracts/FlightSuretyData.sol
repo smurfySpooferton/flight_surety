@@ -8,6 +8,7 @@ contract FlightSuretyData {
     event DidRegisterAirline(address airline);
     event DidFundAirline(address airline);
     event DidRegisterFlight(address airline, string flightNo, uint256 time);
+    event DidRegisterInsurance(address insuree, bytes32 key);
 
     address private contractOwner;                                      // Account used to deploy contract
     address private trustedCaller;
@@ -27,11 +28,17 @@ contract FlightSuretyData {
         uint256 funds;
     }
 
+    struct Insurance {
+        bool isRegistered;
+        bool isPayedOut;
+    }
+
     uint256 private registeredAirlineCount = 0;
     uint256 private fundedAirlineCount = 0;
 
     mapping(address => Airline) private allAirlines;
     mapping(bytes32 => Flight) private flights;
+    mapping(bytes32 => mapping(address => Insurance)) private insurances;
 
     /**
     * @dev Constructor
@@ -188,21 +195,23 @@ contract FlightSuretyData {
      * @dev Buy insurance for a flight
      *
      */
-    function buy() external payable {
+
+    function buy(address insuree, bytes32 key) external requireIsOperational requireCalledFromAppContract {
+        require(!insurances[key][insuree].isRegistered, "Insurance already purchased");
+        insurances[key][insuree] = Insurance(true, false);
+        emit DidRegisterInsurance(insuree, key);
     }
 
-    /**
-     *  @dev Credits payouts to insurees
-    */
-    function creditInsurees() external pure {
+    function isAlreadyInsured(address insuree, bytes32 key) requireIsOperational requireCalledFromAppContract external view returns(bool) {
+        return insurances[key][insuree].isRegistered;
     }
-    
 
     /**
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay() external pure {
+    function claim(bytes32 key, uint256 amount) requireIsOperational requireCalledFromAppContract external {
+
     }
 
     function getFlightKey(address airline, string memory flight, uint256 timestamp) pure internal returns(bytes32) {

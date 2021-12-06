@@ -18,6 +18,7 @@ contract FlightSuretyApp {
 
     uint256 private constant AIRLINE_NO_CONSENT_THRESHOLD = 3; // 4th airline will need consensus
     uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
+    uint256 private constant INSURANCE_FEE = 1 ether;
 
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -196,8 +197,20 @@ contract FlightSuretyApp {
         return status;
     }
 
-   /**
-    * @dev Called after oracle has updated flight status
+    function buy(address airline, string flight, uint256 time) requireIsOperational refund(INSURANCE_FEE) external payable {
+        bytes32 key = getFlightKey(airline, flight, time);
+        require(!flightSuretyData.isAlreadyInsured(msg.sender, key));
+        address(flightSuretyData).transfer(INSURANCE_FEE);
+        flightSuretyData.buy(msg.sender, key);
+    }
+
+    function isAlreadyInsured(address insuree, address airline, string flight, uint256 time) requireIsOperational external view returns(bool) {
+        bytes32 key = getFlightKey(airline, flight, time);
+        return flightSuretyData.isAlreadyInsured(insuree, key);
+    }
+
+    /**
+     * @dev Called after oracle has updated flight status
     *
     */  
     function processFlightStatus(address airline, string memory flight, uint256 timestamp, uint8 statusCode) internal {
@@ -351,4 +364,6 @@ interface IFlightSuretyData {
     function fundAirline(address airline, uint256 funds) external;
     function registerFlight(uint256 time, string flightNo, address airline, uint8 status) external;
     function getFlightStatus(address airline, string flightNo, uint256 time) external returns (uint8);
+    function buy(address insuree, bytes32 key) external;
+    function isAlreadyInsured(address insuree, bytes32 key) external view returns(bool);
 }
