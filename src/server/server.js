@@ -20,9 +20,16 @@ flightSuretyApp.events.OracleRequest({
 const app = express();
 app.get('/api', (req, res) => {
     res.send({
-      message: 'An API for use with your Dapp!'
+      message: getRandomStatus()
     })
 })
+
+const statusBase = 10;
+const statusMaxMultiply = 5;
+
+function getRandomStatus() {
+    return Math.floor(Math.random() * statusMaxMultiply) * statusBase;
+}
 
 export default app;
 

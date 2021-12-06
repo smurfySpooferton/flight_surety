@@ -7,18 +7,18 @@ contract FlightSuretyData {
 
     event DidRegisterAirline(address airline);
     event DidFundAirline(address airline);
-
-    /********************************************************************************************/
-    /*                                       DATA VARIABLES                                     */
-    /********************************************************************************************/
+    event DidRegisterFlight(address airline, string flightNo, uint256 time);
 
     address private contractOwner;                                      // Account used to deploy contract
     address private trustedCaller;
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
-    /********************************************************************************************/
-    /*                                       EVENT DEFINITIONS                                  */
-    /********************************************************************************************/
+    struct Flight {
+        bool isRegistered;
+        uint8 statusCode;
+        uint256 updatedTimestamp;
+        address airline;
+    }
 
     // Airlines
     struct Airline {
@@ -31,6 +31,7 @@ contract FlightSuretyData {
     uint256 private fundedAirlineCount = 0;
 
     mapping(address => Airline) private allAirlines;
+    mapping(bytes32 => Flight) private flights;
 
     /**
     * @dev Constructor
@@ -160,7 +161,8 @@ contract FlightSuretyData {
     }
 
     /**
-    * @dev Fund airline
+    * @dev Initial funding for the insurance. Unless there are too many delayed flights
+    *      resulting in insurance payouts, the contract should be self-sustaining
     *
     */
     function fundAirline(address airline, uint256 funds) external requireIsOperational requireCalledFromAppContract {
@@ -170,28 +172,29 @@ contract FlightSuretyData {
         emit DidFundAirline(airline);
     }
 
+    function registerFlight(uint256 time, string flightNo, address airline, uint8 status) external requireIsOperational requireCalledFromAppContract requireIsRegistered(airline) requireIsFunded(airline) {
+        bytes32 key = getFlightKey(airline, flightNo, time);
+        flights[key] = Flight(true, status, time, airline);
+        emit DidRegisterFlight(airline, flightNo, time);
+    }
+
+    function getFlightStatus(address airline, string flightNo, uint256 time) external returns (uint8) {
+        bytes32 key = getFlightKey(airline, flightNo, time);
+        require(flights[key].isRegistered, "Flight not registered");
+        return flights[key].statusCode;
+    }
+
     /**
      * @dev Buy insurance for a flight
      *
      */
-    function buy
-                            (                             
-                            )
-                            external
-                            payable
-    {
-
+    function buy() external payable {
     }
 
     /**
      *  @dev Credits payouts to insurees
     */
-    function creditInsurees
-                                (
-                                )
-                                external
-                                pure
-    {
+    function creditInsurees() external pure {
     }
     
 
@@ -199,37 +202,10 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay
-                            (
-                            )
-                            external
-                            pure
-    {
+    function pay() external pure {
     }
 
-   /**
-    * @dev Initial funding for the insurance. Unless there are too many delayed flights
-    *      resulting in insurance payouts, the contract should be self-sustaining
-    *
-    */   
-    function fund
-                            (   
-                            )
-                            public
-                            payable
-    {
-    }
-
-    function getFlightKey
-                        (
-                            address airline,
-                            string memory flight,
-                            uint256 timestamp
-                        )
-                        pure
-                        internal
-                        returns(bytes32) 
-    {
+    function getFlightKey(address airline, string memory flight, uint256 timestamp) pure internal returns(bytes32) {
         return keccak256(abi.encodePacked(airline, flight, timestamp));
     }
 
@@ -237,13 +213,7 @@ contract FlightSuretyData {
     * @dev Fallback function for funding smart contract.
     *
     */
-    function() 
-                            external 
-                            payable 
-    {
-        fund();
+    function() external payable {
     }
-
-
 }
 
