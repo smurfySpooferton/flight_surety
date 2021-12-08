@@ -19,6 +19,8 @@ contract FlightSuretyApp {
     uint256 private constant AIRLINE_NO_CONSENT_THRESHOLD = 3; // 4th airline will need consensus
     uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
     uint256 private constant INSURANCE_FEE = 1 ether;
+    uint256 private constant INSURANCE_PAYOUT_MULTIPLY = 3;
+    uint256 private constant INSURANCE_PAYOUT_DIVISOR = 2;
 
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -146,6 +148,10 @@ contract FlightSuretyApp {
         return (status == STATUS_CODE_UNKNOWN || status == STATUS_CODE_ON_TIME || status == STATUS_CODE_LATE_OTHER || status == STATUS_CODE_LATE_AIRLINE || status == STATUS_CODE_LATE_WEATHER || status == STATUS_CODE_LATE_TECHNICAL);
     }
 
+    function creditableStatus(uint8 status) private returns(bool) {
+        return status == STATUS_CODE_LATE_AIRLINE;
+    }
+
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -204,6 +210,10 @@ contract FlightSuretyApp {
         flightSuretyData.buy(msg.sender, key);
     }
 
+    function claim() external {
+        flightSuretyData.claim(msg.sender);
+    }
+
     function isAlreadyInsured(address insuree, address airline, string flight, uint256 time) requireIsOperational external view returns(bool) {
         bytes32 key = getFlightKey(airline, flight, time);
         return flightSuretyData.isAlreadyInsured(insuree, key);
@@ -213,9 +223,14 @@ contract FlightSuretyApp {
      * @dev Called after oracle has updated flight status
     *
     */  
-    function processFlightStatus(address airline, string memory flight, uint256 timestamp, uint8 statusCode) internal {
+    function processFlightStatus(address airline, string memory flight, uint256 timestamp, uint8 statusCode) requireIsOperational private {
+        require(isValidFlightStatus(statusCode), "Invalid flight status");
+        flightSuretyData.updateFlightStatus(airline, flight, timestamp, statusCode);
+        if (creditableStatus(statusCode)) {
+            uint256 credit = (INSURANCE_FEE * INSURANCE_PAYOUT_MULTIPLY) / INSURANCE_PAYOUT_DIVISOR;
+            flightSuretyData.credit(airline, flight, timestamp, credit);
+        }
     }
-
 
     // Generate a request for oracles to fetch flight information
     function fetchFlightStatus(address airline, string flight, uint256 timestamp) external {
@@ -366,4 +381,7 @@ interface IFlightSuretyData {
     function getFlightStatus(address airline, string flightNo, uint256 time) external returns (uint8);
     function buy(address insuree, bytes32 key) external;
     function isAlreadyInsured(address insuree, bytes32 key) external view returns(bool);
+    function updateFlightStatus(address airline, string flightNo, uint256 time, uint8 statusCode) external;
+    function credit(address airline, string flight, uint256 timestamp, uint256 credit) external;
+    function claim(address insuree) external;
 }

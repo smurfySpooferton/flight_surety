@@ -9,6 +9,8 @@ contract FlightSuretyData {
     event DidFundAirline(address airline);
     event DidRegisterFlight(address airline, string flightNo, uint256 time);
     event DidRegisterInsurance(address insuree, bytes32 key);
+    event DidUpdateStatusCode(address airline, string flightNo, uint256 time, uint8 statusCode);
+    event DidCreditInsuree(address insuree, uint256 credit);
 
     address private contractOwner;                                      // Account used to deploy contract
     address private trustedCaller;
@@ -30,7 +32,7 @@ contract FlightSuretyData {
 
     struct Insurance {
         bool isRegistered;
-        bool isPayedOut;
+        bool isCredited;
     }
 
     uint256 private registeredAirlineCount = 0;
@@ -39,6 +41,8 @@ contract FlightSuretyData {
     mapping(address => Airline) private allAirlines;
     mapping(bytes32 => Flight) private flights;
     mapping(bytes32 => mapping(address => Insurance)) private insurances;
+    mapping(address => uint256) private balances;
+    address[] private insureeLookupTable;
 
     /**
     * @dev Constructor
@@ -191,6 +195,12 @@ contract FlightSuretyData {
         return flights[key].statusCode;
     }
 
+    function updateFlightStatus(address airline, string flightNo, uint256 time, uint8 statusCode) external requireIsOperational requireCalledFromAppContract {
+        bytes32 key = getFlightKey(airline, flightNo, time);
+        require(flights[key].isRegistered, "Flight not registered");
+        flights[key].statusCode = statusCode;
+        emit DidUpdateStatusCode(airline, flightNo, time, statusCode);
+    }
     /**
      * @dev Buy insurance for a flight
      *
@@ -199,7 +209,8 @@ contract FlightSuretyData {
     function buy(address insuree, bytes32 key) external requireIsOperational requireCalledFromAppContract {
         require(!insurances[key][insuree].isRegistered, "Insurance already purchased");
         insurances[key][insuree] = Insurance(true, false);
-        emit DidRegisterInsurance(insuree, key);
+        insureeLookupTable.push(insuree);
+        emit DidRegisterInsurance(insureeLookupTable[insureeLookupTable.length - 1], key);
     }
 
     function isAlreadyInsured(address insuree, bytes32 key) requireIsOperational requireCalledFromAppContract external view returns(bool) {
@@ -210,8 +221,22 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function claim(bytes32 key, uint256 amount) requireIsOperational requireCalledFromAppContract external {
+    function claim(address insuree) requireIsOperational requireCalledFromAppContract external {
+        uint256 balance = balances[insuree];
+        require(balance != 0);
+        balances[insuree] = 0;
+        insuree.transfer(balance);
+    }
 
+    function credit(address airline, string flight, uint256 timestamp, uint256 credit) requireIsOperational requireCalledFromAppContract external {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        for (uint i = 0; i < insureeLookupTable.length; i++){
+            insurances[key][insureeLookupTable[i]].isCredited = true;
+            balances[insureeLookupTable[i]] += credit;
+            emit DidCreditInsuree(insureeLookupTable[i], credit);
+            insureeLookupTable[i] = insureeLookupTable[insureeLookupTable.length - 1];
+            delete insureeLookupTable[insureeLookupTable.length - 1];
+        }
     }
 
     function getFlightKey(address airline, string memory flight, uint256 timestamp) pure internal returns(bytes32) {
