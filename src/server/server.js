@@ -19,7 +19,6 @@ async function setup() {
     accounts = await web3.eth.getAccounts();
     web3.eth.defaultAccount = accounts[0];
     registrationFee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
-    await registerOracles();
 }
 
  async function registerOracles() {
@@ -62,7 +61,7 @@ function listenOracleRequests() {
     });
 }
 
-setup();
+registerOracles();
 listenOracleRequests();
 
 const app = express();
