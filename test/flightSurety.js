@@ -2,12 +2,11 @@
 var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
 let Web3 = require('web3');
-const {fa} = require("truffle/build/52.bundled");
 
 contract('Flight Surety Tests', async (accounts) => {
     let time = Math.floor(Date.now() / 1000);
     let flightNo = "LX1051";
-  var config;
+    var config;
     beforeEach('should setup the contract instance', async () => {
         config = await Test.Config(accounts);
         web3 = new Web3(new Web3.providers.HttpProvider(config.url));
@@ -33,11 +32,11 @@ contract('Flight Surety Tests', async (accounts) => {
     });
 
   it(`(multiparty) has correct initial isOperational() value`, async function () {
-
-    // Get operating status
-    let status = await config.flightSuretyData.isOperational.call();
-    assert.equal(status, true, "Incorrect initial operating status value");
-
+        let status = await config.flightSuretyData.isOperational.call();
+        assert.equal(status, true, "Incorrect initial operating status value");
+        await config.flightSuretyData.setOperatingStatus(false, { from: accounts[0] });
+        status = await config.flightSuretyData.isOperational.call();
+        assert.equal(status, false, "Incorrect initial operating status value");
   });
 
   it(`(multiparty) can block access to setOperatingStatus() for non-Contract Owner account`, async function () {

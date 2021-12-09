@@ -1,4 +1,5 @@
 import FlightSuretyApp from '../../build/contracts/FlightSuretyApp.json';
+import FlightSuretyData from '../../build/contracts/FlightSuretyData.json';
 import Config from './config.json';
 import Web3 from 'web3';
 import express from 'express';
@@ -10,15 +11,26 @@ const ORACLE_COUNT = 20;
 let config = Config['localhost'];
 let web3 = new Web3(new Web3.providers.WebsocketProvider(config.url.replace('http', 'ws')));
 let flightSuretyApp = new web3.eth.Contract(FlightSuretyApp.abi, config.appAddress);
+let flightSuretyData = new web3.eth.Contract(FlightSuretyData.abi, config.dataAddress);
 let accounts = [];
 let registrationFee = 0;
 let oracles = [];
 let registrations = [];
+let isOperating = false;
 
 async function setup() {
-    accounts = await web3.eth.getAccounts();
-    web3.eth.defaultAccount = accounts[0];
-    registrationFee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
+    try {
+        accounts = await web3.eth.getAccounts();
+        web3.eth.defaultAccount = accounts[0];
+        registrationFee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
+        isOperating = await flightSuretyApp.methods.isOperational().call();
+    } catch (e){
+        console.log(e);
+    }
+}
+
+async function toggleOperational(isOperational) {
+    flightSuretyData.methods.setOperatingStatus(isOperational).send({from: accounts[0]});
 }
 
  async function registerOracles() {
@@ -85,13 +97,19 @@ app.get('/oracles', (req, res) => {
 
 app.get('/fee', (req, res) => {
     res.send({
-        message: {registrationFee: registrationFee}
+        message: { registrationFee: registrationFee }
     })
 });
 
 app.get('/registrations', (req, res) => {
     res.send({
         message: registrations
+    })
+});
+
+app.get('/operational', (req, res) => {
+    res.send({
+        message: { isOperating: isOperating }
     })
 });
 

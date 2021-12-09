@@ -135,15 +135,6 @@ contract FlightSuretyApp {
         return flightSuretyData.isOperational();  // Modify to call data contract's status
     }
 
-    /**
-    * @dev Sets contract operations on/off
-    *
-    * When operational mode is disabled, all write transactions except for this one will fail
-    */
-    function setOperatingStatus(bool mode) external requireContractOwner {
-        flightSuretyData.setOperatingStatus(mode);
-    }
-
     function isValidFlightStatus(uint8 status) private returns(bool) {
         return (status == STATUS_CODE_UNKNOWN || status == STATUS_CODE_ON_TIME || status == STATUS_CODE_LATE_OTHER || status == STATUS_CODE_LATE_AIRLINE || status == STATUS_CODE_LATE_WEATHER || status == STATUS_CODE_LATE_TECHNICAL);
     }
@@ -370,7 +361,6 @@ contract FlightSuretyApp {
 
 interface IFlightSuretyData {
     function isOperational() public view returns(bool);
-    function setOperatingStatus(bool mode) external;
     function isFunded(address needle) public view returns(bool);
     function isRegistered(address needle) public view returns(bool);
     function getRegisteredAirlineCount() external view returns(uint256);
