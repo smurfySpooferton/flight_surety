@@ -18,13 +18,14 @@ let registrations = [];
 async function setup() {
     accounts = await web3.eth.getAccounts();
     web3.eth.defaultAccount = accounts[0];
+    registrationFee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
+    await registerOracles();
 }
 
  async function registerOracles() {
     await setup();
     for (let i = 0; i < ORACLE_COUNT; i++) {
         try {
-            registrationFee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
             let result = await flightSuretyApp.methods.registerOracle().send({ from: accounts[i], value: registrationFee, gas: GAS });
             oracles.push(accounts[i]);
             registrations.push(result);
@@ -61,7 +62,7 @@ function listenOracleRequests() {
     });
 }
 
-registerOracles();
+setup();
 listenOracleRequests();
 
 const app = express();
