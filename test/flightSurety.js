@@ -148,7 +148,8 @@ contract('Flight Surety Tests', async (accounts) => {
         let consensusPerformed = false;
         let register1 = false;
         let register2 = false;
-        let register3 = true; // we expect false
+        let register3 = false;
+        let register4 = true; // we expect false
         try {
             await config.flightSuretyApp.fundAirline(config.firstAirline, {from: accounts[9], value: amount});
             let isFundedFirst = await config.flightSuretyData.isFunded.call(config.firstAirline);
@@ -156,15 +157,17 @@ contract('Flight Surety Tests', async (accounts) => {
             await config.flightSuretyApp.registerAirline(accounts[9], {from: config.firstAirline});
             await config.flightSuretyApp.registerAirline(accounts[8], {from: config.firstAirline});
             await config.flightSuretyApp.registerAirline(accounts[7], {from: config.firstAirline});
+            await config.flightSuretyApp.registerAirline(accounts[6], {from: config.firstAirline});
             register1 = await config.flightSuretyData.isRegistered(accounts[9]);
             register2 = await config.flightSuretyData.isRegistered(accounts[8]);
-            register3 = await config.flightSuretyData.isRegistered(testAddresses[2]);
+            register3 = await config.flightSuretyData.isRegistered(accounts[7]);
+            register4 = await config.flightSuretyData.isRegistered(testAddresses[2]);
         } catch (e) {
             console.log(e);
         }
         let fundedCount = 0;
         try {
-            await config.flightSuretyApp.vote(accounts[7], {from: accounts[8]});
+            await config.flightSuretyApp.vote(accounts[6], {from: accounts[8]});
             assert.equal(false, true, "Make sure the test fails if vote succeeds");
         } catch (e) {
             assert.equal("Airline not funded", e.reason, "Voting should fail.");
@@ -172,14 +175,16 @@ contract('Flight Surety Tests', async (accounts) => {
         try {
             await config.flightSuretyApp.fundAirline(accounts[9], {from: accounts[9], value: amount});
             await config.flightSuretyApp.fundAirline(accounts[8], {from: accounts[9], value: amount});
-            await config.flightSuretyApp.vote(accounts[7], {from: accounts[9]});
+            await config.flightSuretyApp.fundAirline(accounts[7], {from: accounts[9], value: amount});
+            await config.flightSuretyApp.vote(accounts[6], {from: accounts[9]});
             consensusPerformed = await config.flightSuretyData.isRegistered(accounts[7]);
         } catch (e) {
             console.log(e);
         }
         assert.equal(register1, true, "Airline should be registered");
         assert.equal(register2, true, "Airline should be registered");
-        assert.equal(register3, false, "Airline should not be registered");
+        assert.equal(register3, true, "Airline should be registered");
+        assert.equal(register4, false, "Airline should not be registered");
         assert.equal(consensusPerformed, true, "Airline should be registered now");
     });
 

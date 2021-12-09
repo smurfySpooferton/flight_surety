@@ -93,7 +93,11 @@ contract('Oracles', async (accounts) => {
 
     for (let i = 0; i < insurees.length; i++) {
       let balanceAnte = await web3.eth.getBalance(accounts[i]);
-      let tx = await config.flightSuretyApp.claim({ from: accounts[i] });
+      try {
+        await config.flightSuretyApp.claim({ from: accounts[i] });
+      } catch (e) {
+        console.log(e);
+      }
       let balancePost = await web3.eth.getBalance(accounts[i]);
       let anteEther = web3.utils.fromWei(balanceAnte + "", 'ether');
       let postEther = web3.utils.fromWei(balancePost + "", 'ether');

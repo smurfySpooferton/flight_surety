@@ -231,11 +231,13 @@ contract FlightSuretyData {
     function credit(address airline, string flight, uint256 timestamp, uint256 credit) requireIsOperational requireCalledFromAppContract external {
         bytes32 key = getFlightKey(airline, flight, timestamp);
         for (uint i = 0; i < insureeLookupTable.length; i++){
-            insurances[key][insureeLookupTable[i]].isCredited = true;
-            balances[insureeLookupTable[i]] += credit;
-            emit DidCreditInsuree(insureeLookupTable[i], credit);
-            insureeLookupTable[i] = insureeLookupTable[insureeLookupTable.length - 1];
-            delete insureeLookupTable[insureeLookupTable.length - 1];
+            if (insurances[key][insureeLookupTable[i]].isRegistered) {
+                insurances[key][insureeLookupTable[i]].isCredited = true;
+                balances[insureeLookupTable[i]] += credit;
+                emit DidCreditInsuree(insureeLookupTable[i], credit);
+                insureeLookupTable[i] = insureeLookupTable[insureeLookupTable.length - 1];
+                delete insureeLookupTable[insureeLookupTable.length - 1];
+            }
         }
     }
 
