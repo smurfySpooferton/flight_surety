@@ -39,6 +39,7 @@ contract FlightSuretyData {
     uint256 private fundedAirlineCount = 0;
 
     mapping(address => Airline) private allAirlines;
+    address[] private allFundedAirlines;
     mapping(bytes32 => Flight) private flights;
     mapping(bytes32 => mapping(address => Insurance)) private insurances;
     mapping(address => uint256) private balances;
@@ -179,7 +180,12 @@ contract FlightSuretyData {
         allAirlines[airline].isFunded = true;
         allAirlines[airline].funds = allAirlines[airline].funds.add(funds);
         fundedAirlineCount = fundedAirlineCount.add(1);
+        allFundedAirlines.push(airline);
         emit DidFundAirline(airline);
+    }
+
+    function getAllFundedAirlines() external view requireIsOperational returns (address[]) {
+        return allFundedAirlines;
     }
 
     function registerFlight(uint256 time, string flightNo, address airline, uint8 status) external requireIsOperational requireCalledFromAppContract requireIsRegistered(airline) requireIsFunded(airline) {

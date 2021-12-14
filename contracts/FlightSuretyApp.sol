@@ -180,6 +180,10 @@ contract FlightSuretyApp {
         }
     }
 
+    function getAllFundedAirlines() external view requireIsOperational returns (address[]) {
+        return flightSuretyData.getAllFundedAirlines();
+    }
+
    /**
     * @dev Register a future flight for insuring.
     *
@@ -367,6 +371,7 @@ interface IFlightSuretyData {
     function getFundedAirlineCount() external view returns(uint256);
     function registerAirline(address applicant) external;
     function fundAirline(address airline, uint256 funds) external;
+    function getAllFundedAirlines() external view returns (address[]);
     function registerFlight(uint256 time, string flightNo, address airline, uint8 status) external;
     function getFlightStatus(address airline, string flightNo, uint256 time) external returns (uint8);
     function buy(address insuree, bytes32 key) external;

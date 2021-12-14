@@ -1,6 +1,7 @@
 import FlightSuretyApp from '../../build/contracts/FlightSuretyApp.json';
 import Config from './config.json';
 import Web3 from 'web3';
+const http = require('http');
 
 export default class Contract {
     constructor(network, callback) {
@@ -33,8 +34,20 @@ export default class Contract {
     fetchAirlines(callback) {
         let self = this;
         self.flightSuretyApp.methods
-            .doStuff()
+            .getAllFundedAirlines()
             .call({ from: self.owner}, callback);
+    }
+
+    fetchFlights(airline, callback) {
+        http.get('http://localhost:3000/flights?airline=' + airline, (resp) => {
+            let data = "";
+            resp.on('data', (chunk) => {
+                data += chunk;
+            });
+            resp.on('end', function () {
+                callback(JSON.parse(data));
+            });
+        });
     }
 
     isOperational(callback) {
@@ -46,15 +59,20 @@ export default class Contract {
 
     fetchFlightStatus(flight, callback) {
         let self = this;
-        let payload = {
-            airline: self.airlines[0],
-            flight: flight,
-            timestamp: Math.floor(Date.now() / 1000)
-        };
         self.flightSuretyApp.methods
-            .fetchFlightStatus(payload.airline, payload.flight, payload.timestamp)
+            .fetchFlightStatus(flight.airline, flight.flightNo, flight.time)
             .send({ from: self.owner}, (error, result) => {
                 callback(error, result);
             });
+    }
+
+    listenForStatusUpdates(callback) {
+        let self = this;
+        console.log("self.flightSuretyApp.events");
+        self.flightSuretyApp.events.FlightStatusInfo({}, async (error, event)  => {
+            if (!error) {
+                callback(event);
+            }
+        });
     }
 }

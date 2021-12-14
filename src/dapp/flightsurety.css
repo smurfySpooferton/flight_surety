@@ -37,6 +37,7 @@ label.form {
     font-size: 14px;
     margin-right: 20px;
 }
-input {
+
+.row-element {
     margin-right: 30px;
 }

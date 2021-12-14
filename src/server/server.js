@@ -50,15 +50,13 @@ async function fundAirlineZero() {
         try {
             await fundAirline(firstAirline);
         } catch (e) {
-            console.log(e);
         }
-    } else {
-        airlines.push(firstAirline);
     }
 }
 
 async function rampUp() {
     await fundAirlineZero();
+    airlines = await flightSuretyApp.methods.getAllFundedAirlines().call();
     let airlineCandidates = accounts.slice(40, 44);
     for (let i = 0; i < airlineCandidates.length; i++) {
         let airline = airlineCandidates[i];
@@ -77,9 +75,6 @@ async function rampUp() {
         let isFunded = await flightSuretyData.methods.isFunded(airline).call();
         if (!isFunded) {
             await fundAirline(airline);
-            isFunded = await flightSuretyData.methods.isFunded(airline).call();
-        } else {
-            airlines.push(airline);
         }
     }
     await registerFlights();
@@ -103,11 +98,8 @@ async function performConsensus(candidate) {
 async function fundAirline(airline) {
     try {
         await flightSuretyApp.methods.fundAirline(airline).send({ from: airline, value: airlineRegistrationFee, gas: GAS });
+        airlines = await flightSuretyApp.methods.getAllFundedAirlines().call();
     } catch (e) {
-    }
-    let isFunded = await flightSuretyData.methods.isFunded(airline).call();
-    if (isFunded) {
-        airlines.push(airline);
     }
 }
 
@@ -140,99 +132,90 @@ async function registerFlights() {
     }
 }
 
-async function submitOracleResponse(airline, flight, time) {
+async function submitOracleResponse(index, airline, flight, time) {
     for (let i = 0; i < oracles.length; i++) {
         let indexes = await flightSuretyApp.methods.getMyIndexes().call({ from: oracles[i] });
+        indexes = indexes.filter(myIndex => index === myIndex);
+        if (indexes.length === 0) {
+            continue;
+        }
         let status = getRandomStatus();
-        for (let j = 0; j < indexes.length; j++) {
-            try {
-                await flightSuretyApp.methods.submitOracleResponse(
-                    indexes[j], airline, flight, time, status
-                ).send({from: oracles[i], gas: GAS});
-            } catch(e) {
-                console.log(e);
-            }
+        try {
+            await flightSuretyApp.methods.submitOracleResponse(index, airline, flight, time, status).send({from: oracles[i], gas: GAS});
+        } catch(e) {
+            //console.log(e);
         }
     }
 }
 
-function listenOracleRequests() {
+function listenForOracleRequests() {
     flightSuretyApp.events.OracleRequest({}, async (error, event)  => {
-        console.log("Event received");
-        console.log(error);
-        console.log(event.returnValues);
         if (!error) {
-            await submitOracleResponse(event.returnValues[1], event.returnValues[2], event.returnValues[3])
+            await submitOracleResponse(event.returnValues[0], event.returnValues[1], event.returnValues[2], event.returnValues[3]);
+        }
+    });
+    flightSuretyApp.events.FlightStatusInfo({}, async (error, event)  => {
+        if (!error) {
+            console.log(event);
         }
     });
 }
 
 registerOracles();
-listenOracleRequests();
+listenForOracleRequests();
 
 const app = express();
 app.get('/api', (req, res) => {
-    res.send({
-      message: getRandomStatus()
-    });
+    res.send({status: getRandomStatus()});
 });
 
 app.get('/accounts', (req, res) => {
-    res.send({
-        message: accounts
-    });
+    res.send(accounts);
 });
 
 app.get('/oracles', (req, res) => {
-    res.send({
-        message: oracles
-    });
+    res.send(oracles);
 });
 
 app.get('/oraclefee', (req, res) => {
     res.send({
-        message: {
-            registrationFee: {
-                ether: web3.utils.fromWei('' + oracleRegistrationFee, 'ether'),
-                wei: oracleRegistrationFee + ""
-            }
+        registrationFee: {
+            ether: web3.utils.fromWei('' + oracleRegistrationFee, 'ether'),
+            wei: oracleRegistrationFee + ""
         }
     });
 });
 
 app.get('/airlinefee', (req, res) => {
     res.send({
-        message: {
-            registrationFee: {
-                ether: web3.utils.fromWei('' + airlineRegistrationFee, 'ether'),
-                wei: airlineRegistrationFee + ""
-            }
+        registrationFee: {
+            ether: web3.utils.fromWei('' + airlineRegistrationFee, 'ether'),
+            wei: airlineRegistrationFee + ""
         }
     });
 });
 
 app.get('/registrations', (req, res) => {
-    res.send({
-        message: registrations
-    });
+    res.send(registrations);
 });
 
 app.get('/operational', (req, res) => {
-    res.send({
-        message: { isOperating: isOperating }
-    });
+    res.send({ isOperating: isOperating } );
 });
 
 app.get('/airlines', (req, res) => {
-    res.send({
-        message: airlines
-    });
+    res.send(airlines);
 });
 
 app.get('/flights', (req, res) => {
-    res.send({
-        message: flights
-    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    let result;
+    if (req.query.airline === undefined) {
+        result = flights
+    } else {
+        result = flights.filter(flight => flight.airline === req.query.airline);
+    }
+    res.send(result);
 });
 
 const statusBase = 10;
@@ -243,5 +226,3 @@ function getRandomStatus() {
 }
 
 export default app;
-
-
