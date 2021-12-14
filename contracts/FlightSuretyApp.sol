@@ -17,8 +17,8 @@ contract FlightSuretyApp {
     /********************************************************************************************/
 
     uint256 private constant AIRLINE_NO_CONSENT_THRESHOLD = 4; // 5th airline will need consensus
-    uint256 private constant AIRLINE_FEE_IN_ETH = 10 ether;
-    uint256 private constant INSURANCE_FEE = 1 ether;
+    uint256 public constant AIRLINE_FEE_IN_ETH = 10 ether;
+    uint256 public constant INSURANCE_FEE = 1 ether;
     uint256 private constant INSURANCE_PAYOUT_MULTIPLY = 3;
     uint256 private constant INSURANCE_PAYOUT_DIVISOR = 2;
 

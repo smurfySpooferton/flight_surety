@@ -184,6 +184,7 @@ contract FlightSuretyData {
 
     function registerFlight(uint256 time, string flightNo, address airline, uint8 status) external requireIsOperational requireCalledFromAppContract requireIsRegistered(airline) requireIsFunded(airline) {
         bytes32 key = getFlightKey(airline, flightNo, time);
+        require(!flights[key].isRegistered, "Flight already registered");
         flights[key] = Flight(true, status, time, airline);
         emit DidRegisterFlight(airline, flightNo, time);
     }
