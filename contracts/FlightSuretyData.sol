@@ -229,7 +229,7 @@ contract FlightSuretyData {
     */
     function claim(address insuree) requireIsOperational requireCalledFromAppContract external {
         uint256 balance = balances[insuree];
-        require(balance != 0);
+        require(balance != 0, "No Balance for customer");
         balances[insuree] = 0;
         insuree.transfer(balance);
     }

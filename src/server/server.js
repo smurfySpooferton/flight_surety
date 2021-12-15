@@ -154,11 +154,6 @@ function listenForOracleRequests() {
             await submitOracleResponse(event.returnValues[0], event.returnValues[1], event.returnValues[2], event.returnValues[3]);
         }
     });
-    flightSuretyApp.events.FlightStatusInfo({}, async (error, event)  => {
-        if (!error) {
-            console.log(event);
-        }
-    });
 }
 
 registerOracles();

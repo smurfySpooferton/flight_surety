@@ -62,17 +62,44 @@ export default class Contract {
         self.flightSuretyApp.methods
             .fetchFlightStatus(flight.airline, flight.flightNo, flight.time)
             .send({ from: self.owner}, (error, result) => {
-                callback(error, result);
+                callback(error, flight);
             });
     }
 
     listenForStatusUpdates(callback) {
         let self = this;
-        console.log("self.flightSuretyApp.events");
         self.flightSuretyApp.events.FlightStatusInfo({}, async (error, event)  => {
             if (!error) {
                 callback(event);
             }
         });
+    }
+
+    updateBalance(account, callback) {
+        let self = this;
+        self.web3.eth.getBalance(account).then(balance => { callback(self.web3.utils.fromWei(balance + "", 'ether')) });
+    }
+
+    async purchaseInsurance(account, flight, callback) {
+        let self = this;
+        let amount = await self.flightSuretyApp.methods.INSURANCE_FEE().call();
+        await self.flightSuretyApp.methods.buy(flight.airline, flight.flightNo, flight.time).send({from: account, value: amount + "", gas: 4999999});
+        let success = await self.flightSuretyApp.methods.isAlreadyInsured(account, flight.airline, flight.flightNo, flight.time).call();
+        callback(success);
+    }
+
+    async claim(account, callback) {
+        let self = this;
+        try {
+            await self.flightSuretyApp.methods.claim().send({ from: account, gas: 4999999 });
+            callback(true);
+        } catch (e) {
+            callback(false);
+        }
+    }
+
+    fetchAccounts(callback) {
+        let self = this;
+        self.web3.eth.getAccounts().then(callback);
     }
 }

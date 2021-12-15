@@ -6,6 +6,12 @@ import './flightsurety.css';
 
 (async() => {
     let flights = [];
+
+    function getCurrentFlight() {
+        let flightIndex = DOM.elid('flights-ddown').value;
+        return flights[flightIndex];
+    }
+
     function fetchFlights() {
         contract.fetchFlights(getCurrentAirline(),(result) => {
             let selection = document.getElementById('flights-ddown');
@@ -17,9 +23,21 @@ import './flightsurety.css';
         });
     }
 
+    function updateBalance() {
+        contract.updateBalance(getCurrentAccount(), (eth) => {
+            let selection = document.getElementById('value-balance');
+            selection.innerHTML = eth;
+        });
+    }
+
     let contract = new Contract('localhost', () => {
+        contract.fetchAccounts(result => {
+            let selection = document.getElementById('accounts-ddown');
+            makeOptions(selection, result.map(result => { return { display: result, value: result }}));
+            updateBalance();
+        });
         contract.listenForStatusUpdates((result) => {
-            console.log(result);
+            alert("fu");
         });
         // Read transaction
         contract.isOperational((error, result) => {
@@ -32,23 +50,49 @@ import './flightsurety.css';
             }));
             fetchFlights();
         });
+        DOM.elid('accounts-ddown').addEventListener('change', () => {
+            updateBalance();
+        });
         DOM.elid('airlines-ddown').addEventListener('change', () => {
             fetchFlights();
         });
         // User-submitted transaction
         DOM.elid('submit-oracle').addEventListener('click', () => {
-            let flightIndex = DOM.elid('flights-ddown').value;
-            let flight = flights[flightIndex];
+            let flight = getCurrentFlight();
             // Write transaction
             contract.fetchFlightStatus(flight, (error, result) => {
-                display('Oracles', 'Trigger oracles', [ { label: 'Fetch Flight Status', error: error, value: result.flight + ' ' + result.timestamp} ]);
+                let value = "Airline: " + result.airline + " Flightno.: " + result.flightNo + " Time: " + Date(result.time * 1000);
+                display('Oracles', 'Trigger oracles', [ { label: 'Fetching status for', error: error, value: value } ]);
             });
-        })
+        });
+        DOM.elid('submit-insurance').addEventListener('click', () => {
+            let account = getCurrentAccount();
+            let flight = getCurrentFlight();
+            contract.purchaseInsurance(account, flight, (purchased) => {
+                let value = "Account: " + account + " Airline: " + flight.airline + " Flightno.: " + flight.flightNo + " Time: " + Date(flight.time * 1000);
+                let label = "Purchase was " + (purchased ? "" : "not") + "  successful";
+                display('Insurance', "", [ { label: label, error: null, value: value } ]);
+                updateBalance();
+            });
+        });
+        DOM.elid('submit-claim').addEventListener('click', () => {
+            let account = getCurrentAccount();
+            contract.claim(account, (claimed) => {
+                let value = claimed ? "Claim successful" : "Nothing to claim";
+                let label = "";
+                display('Claim', "Claiming insurance credits", [ { label: label, error: null, value: value } ]);
+                updateBalance();
+            })
+        });
     });
 })();
 
 function getCurrentAirline() {
     return document.getElementById('airlines-ddown').value;
+}
+
+function getCurrentAccount() {
+    return document.getElementById('accounts-ddown').value;
 }
 
 function makeOptions(selection, array) {
@@ -64,6 +108,7 @@ function makeOptions(selection, array) {
 
 function display(title, description, results) {
     let displayDiv = DOM.elid("display-wrapper");
+    displayDiv.innerHTML = "";
     let section = DOM.section();
     section.appendChild(DOM.h2(title));
     section.appendChild(DOM.h5(description));
